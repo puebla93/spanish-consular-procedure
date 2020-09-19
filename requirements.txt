@@ -1,2 +1,4 @@
+Pillow==7.2.0
+pytesseract==0.3.6
 selenium==3.141.0
 urllib3==1.25.10
