@@ -14,5 +14,13 @@ from selenium.common.exceptions import NoSuchElementException, TimeoutException,
 # our imports
 from captcha_resolver import resolve
 
+def argparser():
+    argparser = argparse.ArgumentParser(description="Spanish Consular Procedure")
+	argparser.add_argument('path', help = 'Captcha file path')
+	return args = argparser.parse_args()
+
+def main():
+    pass
+
 if __name__ == '__main__':
     main()
