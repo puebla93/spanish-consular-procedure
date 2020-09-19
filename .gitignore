@@ -1,0 +1,15 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# IDE settings
+.vscode
+.idea
+
+# Images
+*.png
+*.jpg
+*.gif
+*.tiff
+*.bmp
