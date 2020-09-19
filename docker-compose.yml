@@ -3,10 +3,10 @@ version: '3'
 services: 
     script:
         build: .
-        image: cons_esp_habana
+        image: spanish_consular_procedure
         command: bash -c "python main.py"
-        container_name: cons_esp_habana
+        container_name: spanish_consular_procedure
         volumes:
-        - .:/cons_esp_habana
+        - .:/spanish_consular_procedure
         ports:
         - "8000:8000"
