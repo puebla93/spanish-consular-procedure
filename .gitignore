@@ -13,3 +13,5 @@ __pycache__/
 *.gif
 *.tiff
 *.bmp
+
+*.json
