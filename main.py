@@ -3,6 +3,7 @@ import argparse
 import json
 import urllib.request
 from subprocess import check_output
+from io import BytesIO
 
 # Tesseract imports
 import pytesseract
@@ -13,6 +14,7 @@ from selenium import webdriver
 from selenium.common.exceptions import WebDriverException
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
+from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import Select, WebDriverWait
 
@@ -32,8 +34,22 @@ def argparser():
 
 def get_captcha_image():
     print("Getting Catpcha Image")
-    captcha_image_src = driver.find_element_by_id('imagenCaptcha').get_attribute("src")
-    urllib.request.urlretrieve(captcha_image_src, captcha_image_path)
+
+    captcha_image_element = driver.find_element_by_id('imagenCaptcha')
+    location = captcha_image_element.location
+    size = captcha_image_element.size
+    captcha_image = driver.get_screenshot_as_png()
+
+    img = Image.open(BytesIO(captcha_image))
+
+    left = location['x']
+    top = location['y']
+    right = location['x'] + size['width']
+    bottom = location['y'] + size['height']
+
+
+    img = img.crop((left, top, right, bottom)) # defines crop points
+    img.save(captcha_image_path) # saves new cropped image
 
 
 def resolve_captcha():
@@ -67,7 +83,7 @@ def fill_form(identifier, birthday):
 
     try:
         captcha_text = resolve_captcha()
-        print('Text Extracted\n')
+        print('Extracted Text {0}'.format(captcha_text))
     except Exception as identifier:
         print('\nAn error accur while resolving captcha. Exception was: {0}'.format(str(e)))
         driver.quit()
@@ -75,7 +91,7 @@ def fill_form(identifier, birthday):
 
     captcha_input = driver.find_element_by_id('imgcaptcha')
     captcha_input.clear()
-    captcha_input.send_keys("789845")
+    captcha_input.send_keys(captcha_text)
 
     print('Form Filled\n')
 
@@ -85,6 +101,14 @@ def send_notification(status_title, status, email):
 
     email_subject = "Spanish Consular Procedure status"
     email_body = "Your Spanish Consular Procedure status has change. Now is {0} {1}".format(status_title, status)
+
+    # send email
+
+    with open("last_status.json", "w") as last_status_file:
+        json.dump({
+            'status_title': status_title,
+            'status': status
+        }, last_status_file, indent=4)
 
 
 def check_status(email):
@@ -97,18 +121,8 @@ def check_status(email):
 
         if last_status_dict['status_title'] != status_title or last_status_dict['status'] != status:
             send_notification(status_title, status, email)
-
-            with open("last_status.json", "w") as last_status_file:
-                json.dump({
-                    'status_title': status_title,
-                    'status': status
-                }, last_status_file, indent=4)
     except FileNotFoundError:
-        with open("last_status.json", "w") as last_status_file:
-            json.dump({
-                'status_title': status_title,
-                'status': status
-            }, last_status_file, indent=4)
+        send_notification(status_title, status, email)
 
 
 def main():
