@@ -1,18 +1,20 @@
 # base imports
 import argparse
+import json
 import urllib.request
+from subprocess import check_output
+
+# Tesseract imports
 import pytesseract
 from PIL import Image
-from subprocess import check_output
 
 # selenium imports
 from selenium import webdriver
-from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.support.ui import WebDriverWait, Select
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.common.by import By
 from selenium.common.exceptions import WebDriverException
-
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.support.ui import Select, WebDriverWait
 
 driver = None
 url = 'https://sutramiteconsular.maec.es/'
@@ -24,6 +26,7 @@ def argparser():
     argparser.add_argument('-p', '--path', dest='path', type=str, help = 'Captcha file path')
     argparser.add_argument('-i', '--identifier', dest='identifier', type=str, help = 'Consular Procedure Identifier')
     argparser.add_argument('-b', '--birthday', dest='birthday', type=int, help = 'Year Of Birth')
+    argparser.add_argument('-e', '--email', dest='email', type=str, help = 'Email where you want to receive notifications when the Spanish Consular Procedure status changes')
     return argparser.parse_args()
 
 
@@ -41,11 +44,7 @@ def resolve_captcha():
     return pytesseract.image_to_string(Image.open(captcha_image_path))
 
 
-def fill_form():
-    args = argparser()
-    identifier = args.identifier
-    birthday = args.birthday
-
+def fill_form(identifier, birthday):
     print('Filling Form\n')
 
     service_select = Select(driver.find_element_by_id('infServicio'))
@@ -69,7 +68,7 @@ def fill_form():
     try:
         captcha_text = resolve_captcha()
         print('Text Extracted\n')
-    except expression as identifier:
+    except Exception as identifier:
         print('\nAn error accur while resolving captcha. Exception was: {0}'.format(str(e)))
         driver.quit()
         raise e
@@ -81,7 +80,40 @@ def fill_form():
     print('Form Filled\n')
 
 
+def send_notification(status_title, status, email):
+    driver.save_screenshot('current_status_screenshot.png')
+
+    email_subject = "Spanish Consular Procedure status"
+    email_body = "Your Spanish Consular Procedure status has change. Now is {0} {1}".format(status_title, status)
+
+
+def check_status(email):
+    status_title = driver.find_element_by_id('ctl00_ContentPlaceHolderConsulta_TituloEstado').text
+    status = driver.find_element_by_id('ctl00_ContentPlaceHolderConsulta_DescEstado').text
+
+    try:
+        with open("last_status.json", "r") as last_status_file:
+            last_status_dict = json.load(last_status_file)
+
+        if last_status_dict['status_title'] != status_title or last_status_dict['status'] != status:
+            send_notification(status_title, status, email)
+
+            with open("last_status.json", "w") as last_status_file:
+                json.dump({
+                    'status_title': status_title,
+                    'status': status
+                }, last_status_file, indent=4)
+    except FileNotFoundError:
+        with open("last_status.json", "w") as last_status_file:
+            json.dump({
+                'status_title': status_title,
+                'status': status
+            }, last_status_file, indent=4)
+
+
 def main():
+    args = argparser()
+
     # suggested options for docker env
     options = Options()
     # just in case, disable usage of /dev/shm
@@ -106,13 +138,30 @@ def main():
     driver.find_element_by_css_selector('a.headRounded').click()
 
     try:
-        fill_form()
+        identifier = args.identifier
+        birthday = args.birthday
+        fill_form(identifier, birthday)
     except Exception as e:
         print('An error accur while filling form. Exception was: {0}'.format(str(e)))
         driver.quit()
         raise e
 
     driver.find_element_by_id('imgVerSuTramite').click()
+
+    try:
+        WebDriverWait(driver, 15).until(EC.presence_of_element_located((By.ID, 'aspnetForm')))
+    except WebDriverException as e:
+        print("We couldn't open the status of your consular procedure: {0}. Exception was: {1}".format(e.msg, type(e).__name__))
+        driver.quit()
+        raise e
+
+    try:
+        email = args.email
+        check_status(email)
+    except Exception as e:
+        print('\nAn error accur while checking consular procedure status. Exception was: {0}'.format(str(e)))
+        driver.quit()
+        raise e
 
     driver.quit()
 
