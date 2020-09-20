@@ -2,8 +2,8 @@
 import argparse
 import json
 import urllib.request
-from subprocess import check_output
 from io import BytesIO
+from subprocess import check_output
 
 # Tesseract imports
 import pytesseract
